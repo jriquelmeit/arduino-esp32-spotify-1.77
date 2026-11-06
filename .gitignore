@@ -1,0 +1,22 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDEs y Editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Archivos de credenciales y secretos sensibles
+include/secrets.h
+*.local.h
+.env
+
+# Archivos compilados
+*.bin
+*.elf
+*.hex
