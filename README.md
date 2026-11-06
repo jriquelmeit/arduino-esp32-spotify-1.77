@@ -1,6 +1,6 @@
-# Spotify Mini Player TFT 1.44" (ST7735 128x128)
+# Spotify Mini Player TFT 1.77" (ST7735 128x160)
 
-Visor de reproducción en tiempo real para **Spotify** utilizando un microcontrolador **ESP8266 (NodeMCU)** o **ESP32** conectado a una pantalla **TFT LCD 1.44" SPI ST7735 (128x128)**.
+Visor de reproducción en tiempo real para **Spotify** utilizando un microcontrolador **ESP8266 (NodeMCU)** o **ESP32** conectado a una pantalla **TFT LCD 1.77" SPI ST7735 (128x160)**.
 
 Renderiza la carátula oficial del álbum (64x64 px), título de la canción, artista, barra de progreso interactiva con tiempo transcurrido/total, y controles de reproducción (Shuffle, Prev, Play/Pause, Next, Like) con actualización fluida mediante Sprites y decodificación JPEG directa a pantalla con `TFT_eSPI` y `TJpg_Decoder`.
 
@@ -9,7 +9,7 @@ Renderiza la carátula oficial del álbum (64x64 px), título de la canción, ar
 ## Hardware Soportado
 
 - **Placa:** NodeMCU V2/V3 (ESP8266 @ 160MHz) o ESP32 (WROOM / NodeMCU-32S).
-- **Pantalla:** TFT LCD 1.44 pulgadas SPI (Controlador ST7735, resolución 128x128 píxeles).
+- **Pantalla:** TFT LCD 1.77 pulgadas SPI (Controlador ST7735 / ST7735S, resolución 128x160 píxeles).
 
 ---
 
@@ -17,7 +17,7 @@ Renderiza la carátula oficial del álbum (64x64 px), título de la canción, ar
 
 ### Mapeo para NodeMCU ESP8266 (Lolin V3 / V2)
 
-| Pin Pantalla TFT 1.44" | Pin NodeMCU (ESP8266) | Pin GPIO | Descripción |
+| Pin Pantalla TFT 1.77" | Pin NodeMCU (ESP8266) | Pin GPIO | Descripción |
 | :--- | :--- | :--- | :--- |
 | **GND** | `GND` | `GND` | Tierra |
 | **VCC** | `VIN` (5V) o `3V3` | - | Alimentación |

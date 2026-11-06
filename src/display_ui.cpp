@@ -36,14 +36,14 @@ void DisplayUI::showBootScreen(const char* status) {
     _tft.fillScreen(COLOR_BG_DARK);
     
     // Logo Spotify central
-    _tft.drawBitmap(58, 40, epd_bitmap_spotify_logo, 12, 12, COLOR_SPOTIFY_GREEN);
+    _tft.drawBitmap(58, 50, epd_bitmap_spotify_logo, 12, 12, COLOR_SPOTIFY_GREEN);
     
     _tft.setTextColor(COLOR_TEXT_WHITE, COLOR_BG_DARK);
     _tft.setTextDatum(MC_DATUM);
-    _tft.drawString("Spotify Mini", 64, 65, 2);
+    _tft.drawString("Spotify Mini", 64, 75, 2);
 
     _tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
-    _tft.drawString(status, 64, 90, 1);
+    _tft.drawString(status, 64, 105, 1);
 }
 
 void DisplayUI::updateBootProgress(const char* message, uint8_t dots) {
@@ -51,43 +51,43 @@ void DisplayUI::updateBootProgress(const char* message, uint8_t dots) {
     for (uint8_t i = 0; i < (dots % 4); i++) {
         msg += ".";
     }
-    _tft.fillRect(0, 85, 128, 20, COLOR_BG_DARK);
+    _tft.fillRect(0, 100, 128, 20, COLOR_BG_DARK);
     _tft.setTextDatum(MC_DATUM);
-    _tft.drawString(msg, 64, 95, 1);
+    _tft.drawString(msg, 64, 110, 1);
 }
 
 void DisplayUI::drawHeader(bool wifiConnected) {
-    _tft.fillRect(0, 0, 128, 16, COLOR_BG_DARK);
+    _tft.fillRect(0, 0, 128, 18, COLOR_BG_DARK);
 
     // Logo Spotify izquierda
-    _tft.drawBitmap(6, 2, epd_bitmap_spotify_logo, 12, 12, COLOR_SPOTIFY_GREEN);
+    _tft.drawBitmap(6, 4, epd_bitmap_spotify_logo, 12, 12, COLOR_SPOTIFY_GREEN);
 
     // Texto Spotify
     _tft.setTextColor(COLOR_TEXT_WHITE, COLOR_BG_DARK);
     _tft.setTextDatum(TL_DATUM);
-    _tft.drawString("Spotify", 22, 4, 1);
+    _tft.drawString("Spotify", 22, 5, 1);
 
     // Ícono Wi-Fi derecha
     uint16_t wifiColor = wifiConnected ? COLOR_SPOTIFY_GREEN : COLOR_TEXT_MUTED;
-    _tft.drawBitmap(112, 4, epd_bitmap_wifi, 10, 8, wifiColor);
+    _tft.drawBitmap(112, 5, epd_bitmap_wifi, 10, 8, wifiColor);
 }
 
 void DisplayUI::drawIdleScreen() {
     drawHeader(true);
 
-    // Rectángulo central vacío para carátula
-    _tft.drawRoundRect(32, 20, 64, 64, 4, COLOR_BAR_BG);
-    _tft.fillRect(33, 21, 62, 62, COLOR_BG_DARK);
+    // Rectángulo central vacío para carátula (Y: 22 a 86)
+    _tft.drawRoundRect(32, 22, 64, 64, 4, COLOR_BAR_BG);
+    _tft.fillRect(33, 23, 62, 62, COLOR_BG_DARK);
 
     _tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
     _tft.setTextDatum(MC_DATUM);
-    _tft.drawString("Sin reproduccion", 64, 52, 1);
+    _tft.drawString("Sin reproduccion", 64, 54, 1);
 
-    _tft.drawString("Esperando pista...", 64, 95, 1);
+    _tft.drawString("Esperando pista...", 64, 105, 1);
 
     // Limpiar barra de progreso
     _progressSprite.fillSprite(COLOR_BG_DARK);
-    _progressSprite.pushSprite(0, 103);
+    _progressSprite.pushSprite(0, 124);
 
     // Controles en gris
     updatePlaybackControls(false);
@@ -138,13 +138,13 @@ void DisplayUI::updateProgress(uint32_t progressMs, uint32_t durationMs) {
     int knobX = barX + progressW;
     _progressSprite.fillCircle(knobX, barY + 1, 2, COLOR_TEXT_WHITE);
 
-    // Renderizar sprite en la pantalla de inmediato (sin parpadeo)
-    _progressSprite.pushSprite(0, 103);
+    // Renderizar sprite en la pantalla de inmediato (sin parpadeo) en Y=124
+    _progressSprite.pushSprite(0, 124);
 }
 
 void DisplayUI::updatePlaybackControls(bool isPlaying) {
-    // Fila inferior de controles (Y: 116 a 126)
-    int y = 117;
+    // Fila inferior de controles (Y: 142 a 156)
+    int y = 143;
 
     // Shuffle
     _tft.drawBitmap(8, y + 2, epd_bitmap_shuffle, 10, 8, COLOR_TEXT_MUTED);
@@ -174,8 +174,8 @@ void DisplayUI::drawTrack(const SpotifyTrack &track, bool forceFullRedraw) {
         _lastRenderedTrackId = track.id;
         drawHeader(true);
 
-        // Limpiar área de texto de canción y artista (Y: 85 a 102)
-        _tft.fillRect(0, 85, 128, 18, COLOR_BG_DARK);
+        // Limpiar área de texto de canción y artista (Y: 92 a 118)
+        _tft.fillRect(0, 92, 128, 28, COLOR_BG_DARK);
 
         // Título de canción (centrado, truncado a 16 caracteres para no desbordar)
         String displayTitle = track.title;
@@ -184,7 +184,7 @@ void DisplayUI::drawTrack(const SpotifyTrack &track, bool forceFullRedraw) {
         }
         _tft.setTextColor(COLOR_TEXT_WHITE, COLOR_BG_DARK);
         _tft.setTextDatum(TC_DATUM);
-        _tft.drawString(displayTitle, 64, 85, 1);
+        _tft.drawString(displayTitle, 64, 94, 1);
 
         // Artista (centrado, gris tenue)
         String displayArtist = track.artist;
@@ -193,7 +193,7 @@ void DisplayUI::drawTrack(const SpotifyTrack &track, bool forceFullRedraw) {
         }
         _tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
         _tft.setTextDatum(TC_DATUM);
-        _tft.drawString(displayArtist, 64, 94, 1);
+        _tft.drawString(displayArtist, 64, 107, 1);
     }
 
     // Actualizar controles si cambió el estado de reproducción

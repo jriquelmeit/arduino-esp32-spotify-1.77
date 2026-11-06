@@ -14,7 +14,7 @@
 // CONFIGURACIÓN DE PANTALLA Y RENDERIZADO
 // ==========================================
 #define SCREEN_WIDTH        128
-#define SCREEN_HEIGHT       128
+#define SCREEN_HEIGHT       160
 #define TFT_ROTATION        0
 
 // Paleta de colores estilo Spotify (RGB565)

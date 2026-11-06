@@ -119,7 +119,7 @@ void loop() {
                     // Descargar y mostrar carátula si cambió la canción
                     if (isNewSong && currentTrack.imageUrl.length() > 0) {
                         Serial.printf("[Spotify] Descargando portada: %s\n", currentTrack.imageUrl.c_str());
-                        spotify.downloadAlbumArt(currentTrack.imageUrl, 32, 19);
+                        spotify.downloadAlbumArt(currentTrack.imageUrl, 32, 22);
                     }
                 } else {
                     // No hay reproducción activa (idle)
