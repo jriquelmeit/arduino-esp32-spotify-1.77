@@ -174,8 +174,12 @@ void DisplayUI::drawTrack(const SpotifyTrack &track, bool forceFullRedraw) {
         _lastRenderedTrackId = track.id;
         drawHeader(true);
 
-        // Limpiar área de texto de canción y artista (Y: 92 a 118)
-        _tft.fillRect(0, 92, 128, 28, COLOR_BG_DARK);
+        // Limpiar completamente el área de la carátula (Y: 20 a 88) para borrar
+        // cualquier texto de "Sin reproduccion" o bordes residuales del idle
+        _tft.fillRect(0, 19, 128, 70, COLOR_BG_DARK);
+
+        // Limpiar área de texto de canción y artista (Y: 90 a 122)
+        _tft.fillRect(0, 90, 128, 32, COLOR_BG_DARK);
 
         // Título de canción (centrado, truncado a 16 caracteres para no desbordar)
         String displayTitle = track.title;
