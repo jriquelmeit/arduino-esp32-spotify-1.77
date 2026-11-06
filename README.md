@@ -39,41 +39,77 @@ Para que el dispositivo consulte qué canción estás escuchando en tu cuenta de
 2. `SPOTIFY_CLIENT_SECRET`
 3. `SPOTIFY_REFRESH_TOKEN`
 
-### Paso 1: Crear una App en Spotify Developer Dashboard
+---
+
+### Paso 1: Crear una App en Spotify Developer Dashboard y obtener Client ID / Secret
 1. Ve al [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) e inicia sesión con tu cuenta de Spotify.
-2. Haz clic en **Create App**.
-3. Completa los campos:
-   - **App name:** `ESP32 Spotify Display` (o el nombre que prefieras).
+2. Haz clic en el botón **Create App** (arriba a la derecha).
+3. Completa el formulario:
+   - **App name:** `ESP32 Spotify Display` (o el nombre que gustes).
    - **App description:** `Visor de pantalla TFT para Spotify`.
-   - **Redirect URIs:** Agrega exactamente: `http://localhost:8888/callback` y presiona **Add**.
-   - Marca la casilla de aceptación de los Términos de Servicio y haz clic en **Save**.
-4. En la página de tu app, entra a **Settings**:
-   - Copia tu **Client ID**.
-   - Haz clic en **View client secret** y copia tu **Client Secret**.
+   - **Redirect URIs:** Escribe exactamente: `http://localhost:8888/callback` y presiona el botón **Add** para que quede en la lista.
+   - **Which API/SDKs are you planning to use?:** Selecciona la casilla **Web API**.
+   - Marca la casilla aceptando los términos de servicio para desarrolladores.
+   - Haz clic en **Save**.
+4. Una vez creada la app, entra a **Settings**:
+   - En la pestaña **Basic Information** verás tu **Client ID**. Cópialo.
+   - Justo debajo, haz clic en **View client secret** para ver tu **Client Secret**. Cópialo.
 
 ---
 
 ### Paso 2: Generar el `SPOTIFY_REFRESH_TOKEN`
 
-El refresh token le da permiso al ESP para leer el estado de tu reproductor. Para obtenerlo:
+El `Refresh Token` es un token permanente que autoriza al ESP a leer el estado de tu reproductor en segundo plano sin pedirte login cada hora.
 
-#### Opción A (Mediante tu navegador y curl):
-1. Reemplaza `TU_CLIENT_ID` en la siguiente URL y ábrela en tu navegador web:
+Puedes obtenerlo fácilmente con cualquiera de estos dos métodos:
+
+#### Método Rápido A (Navegador + cURL en Terminal)
+
+1. **Obtener el código de autorización:**
+   Copia la siguiente URL, **reemplaza `TU_CLIENT_ID`** por tu Client ID real y ábrela en tu navegador:
    ```text
    https://accounts.spotify.com/authorize?response_type=code&client_id=TU_CLIENT_ID&scope=user-read-playback-state%20user-read-currently-playing&redirect_uri=http://localhost:8888/callback
    ```
-2. Inicia sesión y autoriza la aplicación.
-3. El navegador intentará cargar `http://localhost:8888/callback?code=AQ...` (la página puede decir "no se puede conectar", no importa). Copia todo el valor después de `code=` en la barra de direcciones (hasta antes de cualquier `&` si hubiera). Ese es tu `AUTHORIZATION_CODE`.
-4. Abre una terminal y ejecuta el siguiente comando reemplazando los valores:
+2. Inicia sesión con tu cuenta de Spotify y presiona **Aceptar / Agree**.
+3. El navegador te redirigirá a una página que probablemente dirá *"No se puede conectar"* a `http://localhost:8888/callback?code=AQ...` (esto es normal porque no hay un servidor local corriendo).
+4. **Copia el código de la barra de direcciones:** 
+   En la URL de tu navegador verás algo como:
+   `http://localhost:8888/callback?code=AQD...un_codigo_largo...`
+   Copia todo el texto que está **después de `code=`** (y antes de cualquier `#` o `&` si existiera). Ese es tu `AUTHORIZATION_CODE`.
+   *(Nota: este código expira en 5 minutos, úsalo de inmediato en el paso siguiente).*
+
+5. **Intercambiar el código por el Refresh Token:**
+   Abre tu terminal y ejecuta el siguiente comando reemplazando `TU_CLIENT_ID`, `TU_CLIENT_SECRET` y el código `TU_AUTHORIZATION_CODE`:
    ```bash
-   curl -d client_id="TU_CLIENT_ID" \
+   curl -X POST https://accounts.spotify.com/api/token \
+        -d grant_type=authorization_code \
+        -d client_id="TU_CLIENT_ID" \
         -d client_secret="TU_CLIENT_SECRET" \
-        -d grant_type="authorization_code" \
         -d code="TU_AUTHORIZATION_CODE" \
-        -d redirect_uri="http://localhost:8888/callback" \
-        https://accounts.spotify.com/api/token
+        -d redirect_uri="http://localhost:8888/callback"
    ```
-5. En la respuesta JSON que recibirás, copia el valor de `"refresh_token"`. Ese token no caduca a menos que revoques el acceso en tu cuenta.
+
+6. **Copiar el Refresh Token:**
+   La respuesta en la terminal será un JSON similar a este:
+   ```json
+   {
+      "access_token": "BQC...",
+      "token_type": "Bearer",
+      "expires_in": 3600,
+      "refresh_token": "AQB...ESTE_ES_EL_VALOR_A_COPIAR...",
+      "scope": "user-read-currently-playing user-read-playback-state"
+   }
+   ```
+   Copia el valor de `"refresh_token"`. ¡Este token es permanente y no caduca!
+
+---
+
+#### Método Alternativo B (Generador Web Asistido)
+
+Si prefieres no usar la terminal cURL:
+1. Agrega temporalmente en los **Redirect URIs** de tu app de Spotify en el dashboard la URI: `https://developer.spotify.com/documentation/web-api/tutorials/code-flow` o una herramienta comunitaria confiable de token generation como [Spotify Token Generator](https://get-spotify-refresh-token.vercel.app/).
+2. Ingresa tu `Client ID`, `Client Secret` y marca los scopes `user-read-playback-state` y `user-read-currently-playing`.
+3. Haz clic en autorizar y la herramienta te entregará el `refresh_token` listo para copiar.
 
 ---
 
