@@ -52,7 +52,7 @@ void setup() {
     delay(200);
 
     Serial.println(F("\n=============================================="));
-    Serial.println(F("   Spotify Mini Display 1.44\" ST7735 (128x128)"));
+    Serial.println(F("   Spotify Mini Display 1.77\" ST7735 (128x160)"));
     Serial.println(F("=============================================="));
 
     // 1. Inicializar pantalla TFT y sprites
@@ -113,13 +113,13 @@ void loop() {
                     currentTrack = newTrack;
                     isIdle = false;
 
-                    // Dibujar textos, barra y controles
+                    // Dibujar carátula y footer
                     ui.drawTrack(currentTrack, isNewSong);
 
                     // Descargar y mostrar carátula si cambió la canción
                     if (isNewSong && currentTrack.imageUrl.length() > 0) {
                         Serial.printf("[Spotify] Descargando portada: %s\n", currentTrack.imageUrl.c_str());
-                        spotify.downloadAlbumArt(currentTrack.imageUrl, 32, 22);
+                        spotify.downloadAlbumArt(currentTrack.imageUrl, 0, 0);
                     }
                 } else {
                     // No hay reproducción activa (idle)

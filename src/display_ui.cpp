@@ -3,18 +3,90 @@
 #include "spotify_icons.h"
 #include <TJpg_Decoder.h>
 
+struct JpgRenderConfig {
+    int16_t cropOffsetX = 0;
+    int16_t cropOffsetY = 0;
+    bool upscale2x = false;
+};
+static JpgRenderConfig g_renderConfig;
+
 // Callback global para que TJpg_Decoder envíe bloques a TFT_eSPI
 static TFT_eSPI *pTft = nullptr;
 
+void DisplayUI::setupJpgRender(uint16_t origW, uint16_t origH) {
+    if (origW >= 500) {
+        TJpgDec.setJpgScale(4);
+        g_renderConfig.cropOffsetX = ((int16_t)(origW / 4) - 128) / 2;
+        g_renderConfig.cropOffsetY = ((int16_t)(origH / 4) - 128) / 2;
+        g_renderConfig.upscale2x = false;
+    } else if (origW >= 200) {
+        // Imagen estándar de 300x300 decodificada a escala 1/2 -> 150x150 píxeles nítidos
+        TJpgDec.setJpgScale(2);
+        g_renderConfig.cropOffsetX = ((int16_t)(origW / 2) - 128) / 2; // (150 - 128) / 2 = 11 px
+        g_renderConfig.cropOffsetY = ((int16_t)(origH / 2) - 128) / 2;
+        g_renderConfig.upscale2x = false;
+    } else {
+        // Fallback para imágenes pequeñas (ej. 64x64)
+        TJpgDec.setJpgScale(1);
+        g_renderConfig.cropOffsetX = 0;
+        g_renderConfig.cropOffsetY = 0;
+        g_renderConfig.upscale2x = true;
+    }
+}
+
 bool tftOutputCallback(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
-    if (y >= SCREEN_HEIGHT) return 0;
-    if (pTft) {
-        pTft->pushImage(x, y, w, h, bitmap);
+    if (!pTft) return 0;
+
+    if (g_renderConfig.upscale2x) {
+        // Escalar 2x duplicando píxeles solo para portadas de baja resolución (64x64)
+        int16_t destX = x * 2;
+        int16_t destY = y * 2;
+        uint16_t destW = w * 2;
+
+        uint16_t scaledLine[32];
+        if (destW > 32) destW = 32;
+
+        for (uint16_t row = 0; row < h; row++) {
+            for (uint16_t col = 0; col < w && (col * 2 + 1) < 32; col++) {
+                uint16_t pixel = bitmap[row * w + col];
+                scaledLine[col * 2]     = pixel;
+                scaledLine[col * 2 + 1] = pixel;
+            }
+
+            int16_t screenY1 = destY + (row * 2);
+            int16_t screenY2 = screenY1 + 1;
+
+            if (screenY1 < 128) pTft->pushImage(destX, screenY1, destW, 1, scaledLine);
+            if (screenY2 < 128) pTft->pushImage(destX, screenY2, destW, 1, scaledLine);
+        }
+    } else {
+        // Renderizado nativo de alta resolución con recorte centrado (150x150 -> 128x128)
+        int16_t cropX = g_renderConfig.cropOffsetX;
+        int16_t cropY = g_renderConfig.cropOffsetY;
+
+        for (uint16_t row = 0; row < h; row++) {
+            int16_t imgY = y + row;
+            if (imgY < cropY || imgY >= (cropY + 128)) {
+                continue; // Fuera de los 128 px verticales
+            }
+            int16_t screenY = imgY - cropY;
+
+            int16_t visibleStart = (x > cropX) ? x : cropX;
+            int16_t visibleEnd   = ((x + w - 1) < (cropX + 127)) ? (x + w - 1) : (cropX + 127);
+
+            if (visibleStart <= visibleEnd) {
+                uint16_t count = visibleEnd - visibleStart + 1;
+                uint16_t offsetInBlock = visibleStart - x;
+                int16_t screenX = visibleStart - cropX;
+
+                pTft->pushImage(screenX, screenY, count, 1, &bitmap[row * w + offsetInBlock]);
+            }
+        }
     }
     return 1;
 }
 
-DisplayUI::DisplayUI() : _tft(), _progressSprite(&_tft), _lastRenderedTrackId(""), _lastPlayingState(false) {}
+DisplayUI::DisplayUI() : _tft(), _lastRenderedTrackId(""), _lastProgressW(-1) {}
 
 void DisplayUI::begin() {
     _tft.init();
@@ -26,10 +98,6 @@ void DisplayUI::begin() {
     TJpgDec.setJpgScale(1);
     TJpgDec.setCallback(tftOutputCallback);
     TJpgDec.setSwapBytes(true);
-
-    // Crear sprite en RAM para el progreso y cronómetro (128x14 píxeles = ~3.5 KB)
-    _progressSprite.setColorDepth(16);
-    _progressSprite.createSprite(128, 14);
 }
 
 void DisplayUI::showBootScreen(const char* status) {
@@ -56,115 +124,51 @@ void DisplayUI::updateBootProgress(const char* message, uint8_t dots) {
     _tft.drawString(msg, 64, 110, 1);
 }
 
-void DisplayUI::drawHeader(bool wifiConnected) {
-    _tft.fillRect(0, 0, 128, 18, COLOR_BG_DARK);
+void DisplayUI::drawIdleScreen() {
+    _tft.fillScreen(COLOR_BG_DARK);
 
-    // Logo Spotify izquierda
-    _tft.drawBitmap(6, 4, epd_bitmap_spotify_logo, 12, 12, COLOR_SPOTIFY_GREEN);
-
-    // Texto Spotify
+    // Cabecera sutil en idle (Y: 10)
+    _tft.drawBitmap(8, 8, epd_bitmap_spotify_logo, 12, 12, COLOR_SPOTIFY_GREEN);
     _tft.setTextColor(COLOR_TEXT_WHITE, COLOR_BG_DARK);
     _tft.setTextDatum(TL_DATUM);
-    _tft.drawString("Spotify", 22, 5, 1);
+    _tft.drawString("Spotify", 24, 10, 1);
+    _tft.drawBitmap(110, 10, epd_bitmap_wifi, 10, 8, COLOR_SPOTIFY_GREEN);
 
-    // Ícono Wi-Fi derecha
-    uint16_t wifiColor = wifiConnected ? COLOR_SPOTIFY_GREEN : COLOR_TEXT_MUTED;
-    _tft.drawBitmap(112, 5, epd_bitmap_wifi, 10, 8, wifiColor);
-}
-
-void DisplayUI::drawIdleScreen() {
-    drawHeader(true);
-
-    // Rectángulo central vacío para carátula (Y: 22 a 86)
-    _tft.drawRoundRect(32, 22, 64, 64, 4, COLOR_BAR_BG);
-    _tft.fillRect(33, 23, 62, 62, COLOR_BG_DARK);
-
+    // Marco central en el área de la portada (Y: 28..118)
+    _tft.drawRoundRect(16, 28, 96, 90, 4, COLOR_BAR_BG);
     _tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
     _tft.setTextDatum(MC_DATUM);
-    _tft.drawString("Sin reproduccion", 64, 54, 1);
+    _tft.drawString("Sin reproduccion", 64, 73, 1);
 
-    _tft.drawString("Esperando pista...", 64, 105, 1);
+    // Barra de progreso vacía en Y: 128..129
+    _tft.fillRect(0, 128, SCREEN_WIDTH, 2, COLOR_BAR_BG);
+    _lastProgressW = -1;
 
-    // Limpiar barra de progreso
-    _progressSprite.fillSprite(COLOR_BG_DARK);
-    _progressSprite.pushSprite(0, 124);
-
-    // Controles en gris
-    updatePlaybackControls(false);
+    // Footer inferior (Y: 130..159)
+    _tft.fillRect(0, 130, SCREEN_WIDTH, 30, COLOR_BG_DARK);
+    _tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
+    _tft.setTextDatum(MC_DATUM);
+    _tft.drawString("Esperando musica...", 64, 145, 1);
 
     _lastRenderedTrackId = "";
-}
-
-void DisplayUI::formatTime(uint32_t ms, char *buffer, size_t bufSize) {
-    uint32_t totalSec = ms / 1000;
-    uint32_t minutes = totalSec / 60;
-    uint32_t seconds = totalSec % 60;
-    snprintf(buffer, bufSize, "%u:%02u", minutes, seconds);
 }
 
 void DisplayUI::updateProgress(uint32_t progressMs, uint32_t durationMs) {
     if (durationMs == 0) durationMs = 1;
     if (progressMs > durationMs) progressMs = durationMs;
 
-    _progressSprite.fillSprite(COLOR_BG_DARK);
+    int progressW = (int)(((uint64_t)progressMs * SCREEN_WIDTH) / durationMs);
+    if (progressW > SCREEN_WIDTH) progressW = SCREEN_WIDTH;
 
-    // Formatear tiempos
-    char curTime[10];
-    char totTime[10];
-    formatTime(progressMs, curTime, sizeof(curTime));
-    formatTime(durationMs, totTime, sizeof(totTime));
-
-    _progressSprite.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
-    _progressSprite.setTextDatum(TL_DATUM);
-    _progressSprite.drawString(curTime, 4, 3, 1);
-
-    _progressSprite.setTextDatum(TR_DATUM);
-    _progressSprite.drawString(totTime, 124, 3, 1);
-
-    // Dimensiones de la barra de progreso
-    const int barX = 36;
-    const int barY = 6;
-    const int barW = 56;
-    const int barH = 2;
-
-    _progressSprite.fillRect(barX, barY, barW, barH, COLOR_BAR_BG);
-
-    int progressW = (int)((float)progressMs / (float)durationMs * barW);
-    if (progressW > 0) {
-        _progressSprite.fillRect(barX, barY, progressW, barH, COLOR_SPOTIFY_GREEN);
+    if (progressW != _lastProgressW) {
+        if (progressW > 0) {
+            _tft.fillRect(0, 128, progressW, 2, COLOR_SPOTIFY_GREEN);
+        }
+        if (progressW < SCREEN_WIDTH) {
+            _tft.fillRect(progressW, 128, SCREEN_WIDTH - progressW, 2, COLOR_BAR_BG);
+        }
+        _lastProgressW = progressW;
     }
-
-    // Puntero circular
-    int knobX = barX + progressW;
-    _progressSprite.fillCircle(knobX, barY + 1, 2, COLOR_TEXT_WHITE);
-
-    // Renderizar sprite en la pantalla de inmediato (sin parpadeo) en Y=124
-    _progressSprite.pushSprite(0, 124);
-}
-
-void DisplayUI::updatePlaybackControls(bool isPlaying) {
-    // Fila inferior de controles (Y: 142 a 156)
-    int y = 143;
-
-    // Shuffle
-    _tft.drawBitmap(8, y + 2, epd_bitmap_shuffle, 10, 8, COLOR_TEXT_MUTED);
-
-    // Prev
-    _tft.drawBitmap(28, y + 2, epd_bitmap_prev, 8, 8, COLOR_TEXT_WHITE);
-
-    // Play/Pause central con botón circular verde
-    _tft.fillCircle(64, y + 5, 8, COLOR_SPOTIFY_GREEN);
-    if (isPlaying) {
-        _tft.drawBitmap(61, y + 1, epd_bitmap_pause, 6, 8, COLOR_BG_DARK);
-    } else {
-        _tft.drawBitmap(62, y + 1, epd_bitmap_play, 6, 8, COLOR_BG_DARK);
-    }
-
-    // Next
-    _tft.drawBitmap(92, y + 2, epd_bitmap_next, 8, 8, COLOR_TEXT_WHITE);
-
-    // Heart / Like
-    _tft.drawBitmap(110, y + 2, epd_bitmap_heart, 9, 8, COLOR_HEART_GREEN);
 }
 
 void DisplayUI::drawTrack(const SpotifyTrack &track, bool forceFullRedraw) {
@@ -172,40 +176,35 @@ void DisplayUI::drawTrack(const SpotifyTrack &track, bool forceFullRedraw) {
 
     if (trackChanged) {
         _lastRenderedTrackId = track.id;
-        drawHeader(true);
 
-        // Limpiar completamente el área de la carátula (Y: 20 a 88) para borrar
-        // cualquier texto de "Sin reproduccion" o bordes residuales del idle
-        _tft.fillRect(0, 19, 128, 70, COLOR_BG_DARK);
+        // Limpiar área de carátula (Y: 0 a 127) mientras descarga la nueva imagen
+        _tft.fillRect(0, 0, SCREEN_WIDTH, 128, COLOR_BG_DARK);
 
-        // Limpiar área de texto de canción y artista (Y: 90 a 122)
-        _tft.fillRect(0, 90, 128, 32, COLOR_BG_DARK);
+        // Limpiar área de footer (Y: 130 a 160)
+        _tft.fillRect(0, 130, SCREEN_WIDTH, 30, COLOR_BG_DARK);
 
-        // Título de canción (centrado, truncado a 16 caracteres para no desbordar)
+        // Título de canción centrado en footer (Y: 134, truncado a 20 caracteres)
         String displayTitle = track.title;
-        if (displayTitle.length() > 16) {
-            displayTitle = displayTitle.substring(0, 15) + ".";
+        if (displayTitle.length() > 20) {
+            displayTitle = displayTitle.substring(0, 18) + "..";
         }
         _tft.setTextColor(COLOR_TEXT_WHITE, COLOR_BG_DARK);
         _tft.setTextDatum(TC_DATUM);
-        _tft.drawString(displayTitle, 64, 94, 1);
+        _tft.drawString(displayTitle, 64, 134, 1);
 
-        // Artista (centrado, gris tenue)
+        // Artista centrado en footer (Y: 147, truncado a 20 caracteres)
         String displayArtist = track.artist;
         if (displayArtist.length() > 20) {
-            displayArtist = displayArtist.substring(0, 19) + ".";
+            displayArtist = displayArtist.substring(0, 18) + "..";
         }
         _tft.setTextColor(COLOR_TEXT_MUTED, COLOR_BG_DARK);
         _tft.setTextDatum(TC_DATUM);
-        _tft.drawString(displayArtist, 64, 107, 1);
+        _tft.drawString(displayArtist, 64, 147, 1);
+
+        // Forzar redibujo de la barra de progreso
+        _lastProgressW = -1;
     }
 
-    // Actualizar controles si cambió el estado de reproducción
-    if (_lastPlayingState != track.isPlaying || trackChanged) {
-        _lastPlayingState = track.isPlaying;
-        updatePlaybackControls(track.isPlaying);
-    }
-
-    // Actualizar barra de progreso
+    // Actualizar barra de progreso delgada (Y: 128..129)
     updateProgress(track.progressMs, track.durationMs);
 }

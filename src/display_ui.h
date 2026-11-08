@@ -11,16 +11,12 @@ public:
     void showBootScreen(const char* status);
     void updateBootProgress(const char* message, uint8_t dots);
     void drawIdleScreen();
-    void drawHeader(bool wifiConnected);
     void drawTrack(const SpotifyTrack &track, bool forceFullRedraw);
     void updateProgress(uint32_t progressMs, uint32_t durationMs);
-    void updatePlaybackControls(bool isPlaying);
+    static void setupJpgRender(uint16_t origW, uint16_t origH);
 
 private:
     TFT_eSPI _tft;
-    TFT_eSprite _progressSprite;
     String _lastRenderedTrackId;
-    bool _lastPlayingState;
-
-    void formatTime(uint32_t ms, char *buffer, size_t bufSize);
+    int _lastProgressW;
 };

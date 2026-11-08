@@ -1,7 +1,9 @@
 #include "spotify_service.h"
 #include "config.h"
+#include "display_ui.h"
 #include <ArduinoJson.h>
 #include <TJpg_Decoder.h>
+#include <LittleFS.h>
 
 #if defined(ESP8266)
     #include <ESP8266WiFi.h>
@@ -168,12 +170,12 @@ bool SpotifyService::getCurrentlyPlaying(SpotifyTrack &track) {
             track.artist = artists[0]["name"].as<String>();
         }
 
-        // Seleccionar la imagen más pequeña (64x64) típicamente en el índice 2 o último
+        // Seleccionar la imagen mediana (300x300, índice 1) para alta nitidez visual
         JsonArray images = item["album"]["images"];
         if (images.size() > 0) {
-            // El último elemento suele ser el de 64x64 píxeles
-            int lastIdx = images.size() - 1;
-            track.imageUrl = images[lastIdx]["url"].as<String>();
+            // El índice 1 suele ser de 300x300 píxeles. Si no existe, usar la primera disponible
+            int targetIdx = (images.size() >= 2) ? 1 : 0;
+            track.imageUrl = images[targetIdx]["url"].as<String>();
         }
     }
 
@@ -213,25 +215,64 @@ bool SpotifyService::downloadAlbumArt(const String &url, int16_t x, int16_t y) {
         return false;
     }
 
-    // Usar buffer dinámico o stream directo con TJpg_Decoder
     WiFiClient *stream = https.getStreamPtr();
+
+    // 1. Intentar descargar en buffer RAM si hay memoria disponible (rápido)
     uint8_t *jpgBuffer = (uint8_t *)malloc(len);
-    if (!jpgBuffer) {
-        Serial.println(F("[Spotify] No hay RAM suficiente para buffer JPEG"));
+    if (jpgBuffer) {
+        int bytesRead = stream->readBytes(jpgBuffer, len);
+        https.end();
+
+        if (bytesRead == len) {
+            uint16_t origW = 0, origH = 0;
+            TJpgDec.getJpgSize(&origW, &origH, jpgBuffer, len);
+            DisplayUI::setupJpgRender(origW, origH);
+            TJpgDec.drawJpg(0, 0, jpgBuffer, len);
+            free(jpgBuffer);
+            return true;
+        }
+        free(jpgBuffer);
+        return false;
+    }
+
+    // 2. Si no hubo RAM contigua suficiente (en ESP8266), descargar a LittleFS en bloques de 512B
+    Serial.println(F("[Spotify] RAM contigua insuficiente, usando LittleFS para portada HD..."));
+    LittleFS.begin();
+    File f = LittleFS.open("/art.jpg", "w");
+    if (!f) {
+        Serial.println(F("[Spotify] Error creando archivo LittleFS"));
         https.end();
         return false;
     }
 
-    int bytesRead = stream->readBytes(jpgBuffer, len);
+    uint8_t chunk[512];
+    int remaining = len;
+    while (remaining > 0 && https.connected()) {
+        size_t availableBytes = stream->available();
+        if (availableBytes > 0) {
+            size_t bytesToRead = (availableBytes < sizeof(chunk)) ? availableBytes : sizeof(chunk);
+            if (bytesToRead > (size_t)remaining) bytesToRead = remaining;
+            int readCount = stream->readBytes(chunk, bytesToRead);
+            if (readCount > 0) {
+                f.write(chunk, readCount);
+                remaining -= readCount;
+            }
+        } else {
+            delay(5);
+        }
+    }
+    f.close();
     https.end();
 
-    if (bytesRead == len) {
-        // TJpg_Decoder renderiza directamente a la pantalla TFT_eSPI
-        TJpgDec.drawJpg(x, y, jpgBuffer, len);
-        free(jpgBuffer);
+    if (remaining == 0) {
+        uint16_t origW = 0, origH = 0;
+        TJpgDec.getFsJpgSize(&origW, &origH, "/art.jpg", LittleFS);
+        DisplayUI::setupJpgRender(origW, origH);
+        TJpgDec.drawFsJpg(0, 0, "/art.jpg", LittleFS);
+        LittleFS.remove("/art.jpg");
         return true;
     }
 
-    free(jpgBuffer);
+    LittleFS.remove("/art.jpg");
     return false;
 }

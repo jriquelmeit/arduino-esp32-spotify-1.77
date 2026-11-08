@@ -2,7 +2,7 @@
 
 Visor de reproducción en tiempo real para **Spotify** utilizando un microcontrolador **ESP8266 (NodeMCU)** o **ESP32** conectado a una pantalla **TFT LCD 1.77" SPI ST7735 (128x160)**.
 
-Renderiza la carátula oficial del álbum (64x64 px), título de la canción, artista, barra de progreso interactiva con tiempo transcurrido/total, y controles de reproducción (Shuffle, Prev, Play/Pause, Next, Like) con actualización fluida mediante Sprites y decodificación JPEG directa a pantalla con `TFT_eSPI` y `TJpg_Decoder`.
+Renderiza la carátula oficial del álbum a tamaño completo (128x128 px escalado 2x de alta eficiencia), barra de progreso delgada integrada (2 px) y footer inferior con el título de la canción y nombre del artista con renderizado fluido mediante `TFT_eSPI` y decodificación directa a pantalla con `TJpg_Decoder`.
 
 ---
 
